@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:;"
+    />
+    <title>Sentinel Vector - StockWatcher Overlay</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body class="overlay-body bg-none">
+    <div class="overlay">
+      <div id="overlayRows" class="overlay-rows"></div>
+      <div id="overlayEmpty" class="overlay-empty hidden">No symbols</div>
+    </div>
+    <script src="overlay.js"></script>
+  </body>
+</html>

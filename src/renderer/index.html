@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:;"
+    />
+    <title>Sentinel Vector - StockWatcher</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <div class="logo" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="19" height="19">
+            <path
+              d="M3 16.5l5.2-6.1 4.1 3 5-6.9 3.7 4.1"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+        </div>
+        <div class="brand-text">
+          <h1>Sentinel Vector - StockWatcher</h1>
+          <p>Technical analysis watchlist</p>
+        </div>
+      </div>
+
+      <div class="status">
+        <span id="marketChip" class="chip">Loading</span>
+        <span id="updated" class="updated">Waiting for data</span>
+      </div>
+
+      <div class="actions">
+        <span id="countdown" class="countdown" title="Next automatic refresh">--:--</span>
+        <button id="soundBtn" class="icon-btn" type="button" title="Alert sounds (right-click to test)">&#128266;</button>
+        <select id="intervalSelect" class="interval" title="Refresh interval">
+          <option value="1">1 min</option>
+          <option value="2">2 min</option>
+          <option value="5">5 min</option>
+          <option value="10" selected>10 min</option>
+          <option value="15">15 min</option>
+          <option value="30">30 min</option>
+        </select>
+        <button id="refreshBtn" class="icon-btn" type="button" title="Refresh now (Ctrl+R)">&#8635;</button>
+        <button id="settingsBtn" class="icon-btn" type="button" title="Settings">&#9881;</button>
+        <button id="addBtn" class="primary" type="button">
+          <span class="plus">+</span> Add symbol
+        </button>
+      </div>
+    </header>
+
+    <main class="stage">
+      <section class="grid-card">
+        <table id="grid" class="grid">
+          <thead>
+            <tr>
+              <th scope="col" class="sortable" data-sort="symbol">Symbol</th>
+              <th scope="col" class="sortable num" data-sort="open">Day open</th>
+              <th scope="col" class="sortable num" data-sort="price">Current</th>
+              <th scope="col" class="sortable num" data-sort="changePct">Change %</th>
+              <th scope="col" class="sortable num" data-sort="volume">Volume</th>
+              <th scope="col" class="sortable" data-sort="rating">Tech analysis</th>
+              <th scope="col" class="col-remove"><span class="sr-only">Remove</span></th>
+            </tr>
+          </thead>
+          <tbody id="gridBody"></tbody>
+        </table>
+
+        <div id="changeFeed" class="change-feed" hidden>
+          <div class="change-feed-head">
+            <span>Rating changes · today</span>
+            <span class="change-until">time changed</span>
+          </div>
+          <div id="changeFeedItems" class="change-feed-items"></div>
+        </div>
+
+        <div id="emptyState" class="empty">
+          <div class="empty-mark">$</div>
+          <h2>Nothing on the watchlist yet</h2>
+          <p>Add a symbol like <b>FCX</b> to track its open, current price, volume and technical rating.</p>
+          <button id="emptyAddBtn" class="primary" type="button"><span class="plus">+</span> Add your first symbol</button>
+        </div>
+      </section>
+    </main>
+
+    <div id="popover" class="popover" hidden>
+      <div class="popover-head">Open <b id="popSymbol"></b> on</div>
+      <div id="popOptions"></div>
+    </div>
+
+    <div id="modal" class="modal" hidden>
+      <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+        <div class="modal-head">
+          <h2 id="modalTitle">Add a symbol</h2>
+          <p>Type a ticker or company name. United States listings are shown first.</p>
+        </div>
+        <div class="search-wrap">
+          <svg class="search-icon" viewBox="0 0 24 24" width="17" height="17" aria-hidden="true">
+            <circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2" />
+            <path d="M16.5 16.5L21 21" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+          </svg>
+          <input
+            id="searchInput"
+            type="text"
+            placeholder="e.g. FCX, Apple, SPY"
+            autocomplete="off"
+            spellcheck="false"
+            aria-label="Search for a stock symbol"
+          />
+        </div>
+        <div id="searchResults" class="results"></div>
+        <div class="modal-foot">
+          <span id="searchStatus" class="search-status"></span>
+          <button id="cancelBtn" class="ghost" type="button">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="toasts" class="toasts" aria-live="polite"></div>
+
+    <div id="settingsModal" class="modal" hidden>
+      <div class="modal-card settings-card" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+        <div class="modal-head">
+          <h2 id="settingsTitle">Settings</h2>
+          <p>Overlay, appearance and alerts.</p>
+        </div>
+
+        <div class="settings-body">
+          <section class="setting-group">
+            <h3>Floating overlay</h3>
+
+            <label class="switch-row">
+              <span>Show overlay over other apps</span>
+              <input type="checkbox" id="setOverlayEnabled" />
+            </label>
+
+            <div class="setting-row">
+              <span>Background</span>
+              <div class="segmented" id="setBackground">
+                <button type="button" data-bg="none">None</button>
+                <button type="button" data-bg="dim">Dim</button>
+                <button type="button" data-bg="solid">Solid</button>
+              </div>
+            </div>
+
+            <div class="setting-row" id="dimRow">
+              <span>Dim strength</span>
+              <input type="range" id="setDim" min="10" max="90" step="5" />
+              <output id="dimValue">45%</output>
+            </div>
+
+            <div class="setting-row">
+              <span>Width</span>
+              <input type="range" id="setWidth" min="240" max="520" step="10" />
+              <output id="widthValue">300px</output>
+            </div>
+
+            <div class="setting-row">
+              <span>Corner</span>
+              <select id="setCorner">
+                <option value="top-left">Top left</option>
+                <option value="top-right">Top right</option>
+                <option value="bottom-left">Bottom left</option>
+                <option value="bottom-right">Bottom right</option>
+              </select>
+            </div>
+
+            <div class="setting-row">
+              <span>Margin</span>
+              <input type="range" id="setMargin" min="0" max="80" step="4" />
+              <output id="marginValue">24px</output>
+            </div>
+
+            <div class="setting-row">
+              <span>Overlay columns</span>
+              <div class="checks">
+                <label><input type="checkbox" id="colPrice" /> Price</label>
+                <label><input type="checkbox" id="colChange" /> Change</label>
+                <label><input type="checkbox" id="colRating" /> Tech</label>
+              </div>
+            </div>
+          </section>
+
+          <section class="setting-group">
+            <h3>Alert sounds</h3>
+
+            <label class="switch-row">
+              <span>Play a sound when a rating changes</span>
+              <input type="checkbox" id="setSounds" />
+            </label>
+
+            <div id="soundList" class="sound-list">
+              <div class="sound-row" data-key="strongBuy">
+                <span class="sound-name sb">Strong Buy</span>
+                <select class="sound-select" aria-label="Sound for Strong Buy"></select>
+                <button type="button" class="sound-preview" title="Preview this sound">
+                  &#9654;
+                </button>
+              </div>
+              <div class="sound-row" data-key="buy">
+                <span class="sound-name b">Buy</span>
+                <select class="sound-select" aria-label="Sound for Buy"></select>
+                <button type="button" class="sound-preview" title="Preview this sound">
+                  &#9654;
+                </button>
+              </div>
+              <div class="sound-row" data-key="neutral">
+                <span class="sound-name n">Neutral</span>
+                <select class="sound-select" aria-label="Sound for Neutral"></select>
+                <button type="button" class="sound-preview" title="Preview this sound">
+                  &#9654;
+                </button>
+              </div>
+              <div class="sound-row" data-key="sell">
+                <span class="sound-name s">Sell</span>
+                <select class="sound-select" aria-label="Sound for Sell"></select>
+                <button type="button" class="sound-preview" title="Preview this sound">
+                  &#9654;
+                </button>
+              </div>
+              <div class="sound-row" data-key="strongSell">
+                <span class="sound-name ss">Strong Sell</span>
+                <select class="sound-select" aria-label="Sound for Strong Sell"></select>
+                <button type="button" class="sound-preview" title="Preview this sound">
+                  &#9654;
+                </button>
+              </div>
+            </div>
+
+            <p class="settings-hint sound-hint">
+              Each rating can use a different tone. Sounds play only when a rating changes while the
+              US market is open.
+            </p>
+          </section>
+
+          <section class="setting-group">
+            <h3>Window</h3>
+
+            <label class="switch-row">
+              <span>Keep main window on top</span>
+              <input type="checkbox" id="setAlwaysOnTop" />
+            </label>
+          </section>
+
+          <p class="settings-hint">
+            The overlay is click-through: it never blocks the app behind it. Use the main window to
+            open links. <b>Ctrl+Alt+O</b> toggles the overlay, <b>Ctrl+Alt+M</b> brings this window
+            back.
+          </p>
+        </div>
+
+        <div class="modal-foot">
+          <span class="search-status">Changes apply instantly.</span>
+          <button id="closeSettingsBtn" class="ghost" type="button">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="sound.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>

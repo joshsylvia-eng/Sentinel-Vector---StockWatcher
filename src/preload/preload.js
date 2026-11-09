@@ -11,9 +11,18 @@ contextBridge.exposeInMainWorld('api', {
   search: (query) => ipcRenderer.invoke('search:symbols', query),
   add: (candidate) => ipcRenderer.invoke('watchlist:add', candidate),
   remove: (symbol) => ipcRenderer.invoke('watchlist:remove', symbol),
+  setStockAlert: (symbol, on) => ipcRenderer.invoke('watchlist:setAlert', { symbol, on }),
+  exportData: () => ipcRenderer.invoke('data:export'),
+  importData: () => ipcRenderer.invoke('data:import'),
   refresh: () => ipcRenderer.invoke('quotes:refresh'),
   setSettings: (patch) => ipcRenderer.invoke('settings:update', patch),
   openLink: (symbol, id) => ipcRenderer.invoke('link:open', { symbol, id }),
+  chart: (symbol, range) => ipcRenderer.invoke('chart:get', { symbol, range }),
+  setProviderKey: (id, key) => ipcRenderer.invoke('provider:setKey', { id, key }),
+  testProvider: (id) => ipcRenderer.invoke('provider:test', { id }),
+  refreshProvider: (id) => ipcRenderer.invoke('provider:refresh', { id }),
+  openKeyPage: (id) => ipcRenderer.invoke('provider:openKeyPage', { id }),
+  clearChanges: () => ipcRenderer.invoke('changes:clear'),
 
   // Window auto-sizing (fire and forget).
   fit: (height) => ipcRenderer.send('main:fit', height),

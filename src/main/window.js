@@ -30,7 +30,7 @@ function init(options) {
 
 function createMainWindow() {
   mainWindow = new BrowserWindow({
-    width: 1160,
+    width: 1480,
     height: 420,
     minWidth: 720,
     minHeight: 260,
@@ -83,12 +83,20 @@ function showMainWindow() {
 }
 
 function fitMain(height) {
-  if (!mainWindow || mainWindow.isDestroyed() || userResizedMain) return;
+  if (!mainWindow || mainWindow.isDestroyed()) return;
 
   const { workArea } = screen.getPrimaryDisplay();
   const maxHeight = Math.max(260, Math.min(1000, workArea.height - 40));
-  const target = Math.round(Math.min(maxHeight, Math.max(260, Number(height) || 0)));
+  const desired = Math.round(Math.min(maxHeight, Math.max(260, Number(height) || 0)));
   const [width, current] = mainWindow.getContentSize();
+
+  // Allow the window to grow to fit new content (like the rating-change feed)
+  // even if the user has manually resized it. Only shrink if we never grew
+  // programmatically beyond the user's size in a conflicting way; if the
+  // requested height is larger than current, always expand. If smaller and the
+  // user resized, we still avoid shrinking below what content needs, but we
+  // don't fight the user's chosen height aggressively.
+  const target = desired > current ? desired : userResizedMain ? current : desired;
   if (Math.abs(target - current) < 3) return;
 
   // Keep our own auto-fit from being mistaken for a user resize.

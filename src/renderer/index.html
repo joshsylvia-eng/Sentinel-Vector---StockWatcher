@@ -9,7 +9,7 @@
     <title>Sentinel Vector - StockWatcher</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
-  <body>
+  <body class="main-body">
     <header class="topbar">
       <div class="brand">
         <div class="logo" aria-hidden="true">
@@ -31,7 +31,25 @@
       </div>
 
       <div class="status">
+        <div class="watch-search">
+          <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+            <circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2" />
+            <path d="M16.5 16.5L21 21" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+          </svg>
+          <input
+            id="watchSearch"
+            type="text"
+            placeholder="Search watchlist…"
+            autocomplete="off"
+            spellcheck="false"
+            aria-label="Search your watchlist"
+          />
+          <button id="clearWatchSearch" type="button" class="watch-search-clear" title="Clear search" hidden>
+            &times;
+          </button>
+        </div>
         <span id="marketChip" class="chip">Loading</span>
+        <span id="indices" class="indices" aria-label="Major index day change"></span>
         <span id="updated" class="updated">Waiting for data</span>
       </div>
 
@@ -47,6 +65,7 @@
           <option value="30">30 min</option>
         </select>
         <button id="refreshBtn" class="icon-btn" type="button" title="Refresh now (Ctrl+R)">&#8635;</button>
+        <button id="columnsBtn" class="icon-btn columns-btn" type="button" title="Show / hide columns and sounds (or right-click a column header). Drag the lines between headers to resize.">&#9638; Columns</button>
         <button id="settingsBtn" class="icon-btn" type="button" title="Settings">&#9881;</button>
         <button id="addBtn" class="primary" type="button">
           <span class="plus">+</span> Add symbol
@@ -56,25 +75,27 @@
 
     <main class="stage">
       <section class="grid-card">
+        <div class="grid-scroll">
         <table id="grid" class="grid">
+          <colgroup id="gridCols"></colgroup>
           <thead>
-            <tr>
-              <th scope="col" class="sortable" data-sort="symbol">Symbol</th>
-              <th scope="col" class="sortable num" data-sort="open">Day open</th>
-              <th scope="col" class="sortable num" data-sort="price">Current</th>
-              <th scope="col" class="sortable num" data-sort="changePct">Change %</th>
-              <th scope="col" class="sortable num" data-sort="volume">Volume</th>
-              <th scope="col" class="sortable" data-sort="rating">Tech analysis</th>
-              <th scope="col" class="col-remove"><span class="sr-only">Remove</span></th>
-            </tr>
+            <tr id="gridHead"></tr>
           </thead>
           <tbody id="gridBody"></tbody>
         </table>
+        </div>
+
+        <div id="noMatches" class="no-matches" hidden></div>
 
         <div id="changeFeed" class="change-feed" hidden>
           <div class="change-feed-head">
-            <span>Rating changes · today</span>
-            <span class="change-until">time changed</span>
+            <span id="changeFeedTitle">Rating changes · today</span>
+            <span class="change-feed-tools">
+              <button id="feedSmallerBtn" type="button" class="feed-tool" title="Smaller notification text">A&minus;</button>
+              <button id="feedLargerBtn" type="button" class="feed-tool" title="Larger notification text">A+</button>
+              <button id="feedColumnsBtn" type="button" class="feed-tool" title="Show / hide feed columns">Columns</button>
+              <button id="feedClearBtn" type="button" class="feed-tool" title="Clear today's changes">Clear</button>
+            </span>
           </div>
           <div id="changeFeedItems" class="change-feed-items"></div>
         </div>
@@ -88,9 +109,29 @@
       </section>
     </main>
 
+    <div id="chartCard" class="chart-card" hidden>
+      <div class="chart-head">
+        <b id="chartSymbol"></b>
+        <span id="chartName" class="chart-name"></span>
+        <span id="chartChange" class="chart-change"></span>
+      </div>
+      <div id="chartRanges" class="chart-ranges"></div>
+      <div id="chartBody" class="chart-body"></div>
+      <div id="chartFoot" class="chart-foot"></div>
+    </div>
+
     <div id="popover" class="popover" hidden>
       <div class="popover-head">Open <b id="popSymbol"></b> on</div>
       <div id="popOptions"></div>
+    </div>
+
+    <div id="columnMenu" class="popover column-menu" hidden>
+      <div class="popover-head" id="columnMenuTitle">Columns</div>
+      <div id="columnMenuBody" class="col-list"></div>
+      <div class="column-menu-foot">
+        <button type="button" class="feed-tool" data-colmenu="all">Show all</button>
+        <button type="button" class="feed-tool" data-colmenu="reset">Defaults</button>
+      </div>
     </div>
 
     <div id="modal" class="modal" hidden>
@@ -125,20 +166,132 @@
 
     <div id="settingsModal" class="modal" hidden>
       <div class="modal-card settings-card" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
-        <div class="modal-head">
-          <h2 id="settingsTitle">Settings</h2>
-          <p>Overlay, appearance and alerts.</p>
+        <div class="modal-head settings-head">
+          <div>
+            <h2 id="settingsTitle">Settings</h2>
+            <p>Data sources, columns, alerts and overlay. Changes apply instantly.</p>
+          </div>
+          <button id="closeSettingsBtn" class="ghost" type="button">Close</button>
         </div>
 
-        <div class="settings-body">
-          <section class="setting-group">
-            <h3>Floating overlay</h3>
+        <div class="settings-body settings-grid">
+          <section class="setting-group sg-sources">
+            <h3>Data sources <span class="h3-note">API keys are encrypted with Windows DPAPI on this PC and never shown again. Sources without a key stay off until you add one and tick the box.</span></h3>
+            <div id="providerSettings" class="provider-list"></div>
+          </section>
 
+          <section class="setting-group sg-table">
+            <h3>Main table</h3>
+            <div class="setting-row">
+              <span>Colours</span>
+              <div class="theme-choices" id="themeGroup">
+                <button type="button" class="theme-choice" data-theme="dark"><span class="theme-swatch dark"></span>Dark</button>
+                <button type="button" class="theme-choice" data-theme="light"><span class="theme-swatch light"></span>Light</button>
+                <button type="button" class="theme-choice" data-theme="contrast" title="High contrast, colour-blind safe: blue = buy, orange = sell, with ▲ ▼ shapes"><span class="theme-swatch contrast"></span>High contrast</button>
+              </div>
+            </div>
+            <div class="setting-row">
+              <span>Text size</span>
+              <div class="segmented" id="tableSizeGroup">
+                <button type="button" data-size="xsmall">8 pt</button>
+                <button type="button" data-size="small">10 pt</button>
+                <button type="button" data-size="medium">12 pt</button>
+                <button type="button" data-size="large">14 pt</button>
+              </div>
+            </div>
+            <div class="setting-row">
+              <span>Notification text</span>
+              <div class="segmented" id="feedSizeGroup" title="Text size of the rating-change feed under the table">
+                <button type="button" data-feed-size="xsmall">XS</button>
+                <button type="button" data-feed-size="small">S</button>
+                <button type="button" data-feed-size="medium">M</button>
+                <button type="button" data-feed-size="large">L</button>
+                <button type="button" data-feed-size="xlarge">XL</button>
+              </div>
+            </div>
+            <div class="setting-row">
+              <span>Hover chart size</span>
+              <div class="segmented" id="chartSizeGroup">
+                <button type="button" data-chart-size="xsmall">XS</button>
+                <button type="button" data-chart-size="small">S</button>
+                <button type="button" data-chart-size="medium">M</button>
+                <button type="button" data-chart-size="large">L</button>
+                <button type="button" data-chart-size="xlarge">XL</button>
+              </div>
+            </div>
+            <div class="setting-row">
+              <span>Column widths</span>
+              <button id="resetColWidthsBtn" class="ghost small" type="button">Reset widths</button>
+            </div>
+            <div class="col-settings-head"><span>Tick to show a column · &#128276; = play a sound when it changes</span></div>
+            <div id="columnSettings" class="col-list in-settings"></div>
+          </section>
+
+          <section class="setting-group sg-sounds">
+            <h3>Alert sounds</h3>
+            <label class="switch-row">
+              <span>Play a sound when a rating changes</span>
+              <input type="checkbox" id="setSounds" />
+            </label>
+            <div id="soundList" class="sound-list">
+                <div class="sound-row" data-key="strongBuy">
+                  <span class="sound-name sb">Strong Buy</span>
+                  <select class="sound-select" aria-label="Sound for Strong Buy"></select>
+                  <button type="button" class="sound-preview" title="Preview this sound">&#9654;</button>
+                </div>
+                <div class="sound-row" data-key="buy">
+                  <span class="sound-name b">Buy</span>
+                  <select class="sound-select" aria-label="Sound for Buy"></select>
+                  <button type="button" class="sound-preview" title="Preview this sound">&#9654;</button>
+                </div>
+                <div class="sound-row" data-key="neutral">
+                  <span class="sound-name n">Neutral</span>
+                  <select class="sound-select" aria-label="Sound for Neutral"></select>
+                  <button type="button" class="sound-preview" title="Preview this sound">&#9654;</button>
+                </div>
+                <div class="sound-row" data-key="sell">
+                  <span class="sound-name s">Sell</span>
+                  <select class="sound-select" aria-label="Sound for Sell"></select>
+                  <button type="button" class="sound-preview" title="Preview this sound">&#9654;</button>
+                </div>
+                <div class="sound-row" data-key="strongSell">
+                  <span class="sound-name ss">Strong Sell</span>
+                  <select class="sound-select" aria-label="Sound for Strong Sell"></select>
+                  <button type="button" class="sound-preview" title="Preview this sound">&#9654;</button>
+                </div>
+            </div>
+            <p class="settings-hint">
+              Tone follows the new rating. Pick which columns make a sound under <b>Main table → Sound</b>,
+              or click the &#128276; beside a symbol to sound on every change for just that stock.
+              Sounds play only while the US market is open.
+            </p>
+          </section>
+
+          <section class="setting-group sg-backup">
+            <h3>Backup &amp; move to another PC</h3>
+            <div class="setting-row">
+              <span>Watchlist</span>
+              <span class="backup-buttons">
+                <button id="exportBtn" class="ghost small" type="button" title="Save your symbols, stock bells and settings to a file">Export&hellip;</button>
+                <button id="importBtn" class="ghost small" type="button" title="Load symbols (and optionally settings) from an export file">Import&hellip;</button>
+              </span>
+            </div>
+            <p class="settings-hint">
+              Exports symbols, per-stock bells and settings to a .json file. API keys stay on this PC
+              (they're encrypted to your Windows account), so re-enter them on the new machine.
+            </p>
+          </section>
+
+          <section class="setting-group sg-overlay">
+            <h3>Floating overlay &amp; window</h3>
             <label class="switch-row">
               <span>Show overlay over other apps</span>
               <input type="checkbox" id="setOverlayEnabled" />
             </label>
-
+            <label class="switch-row">
+              <span>Keep main window on top</span>
+              <input type="checkbox" id="setAlwaysOnTop" />
+            </label>
             <div class="setting-row">
               <span>Background</span>
               <div class="segmented" id="setBackground">
@@ -147,19 +300,21 @@
                 <button type="button" data-bg="solid">Solid</button>
               </div>
             </div>
-
             <div class="setting-row" id="dimRow">
               <span>Dim strength</span>
               <input type="range" id="setDim" min="10" max="90" step="5" />
               <output id="dimValue">45%</output>
             </div>
-
             <div class="setting-row">
               <span>Width</span>
               <input type="range" id="setWidth" min="240" max="520" step="10" />
               <output id="widthValue">300px</output>
             </div>
-
+            <div class="setting-row">
+              <span>Margin</span>
+              <input type="range" id="setMargin" min="0" max="80" step="4" />
+              <output id="marginValue">24px</output>
+            </div>
             <div class="setting-row">
               <span>Corner</span>
               <select id="setCorner">
@@ -169,94 +324,28 @@
                 <option value="bottom-right">Bottom right</option>
               </select>
             </div>
-
             <div class="setting-row">
-              <span>Margin</span>
-              <input type="range" id="setMargin" min="0" max="80" step="4" />
-              <output id="marginValue">24px</output>
+              <span>Sort overlay by</span>
+              <select id="setOverlaySort" title="Order of symbols in the overlay"></select>
+              <button type="button" id="setOverlayDir" class="ghost small" title="Toggle sort direction">&#8595; High first</button>
             </div>
-
             <div class="setting-row">
-              <span>Overlay columns</span>
+              <span>Rating shown</span>
+              <select id="setOverlayRating" title="Which column's rating the overlay pill shows"></select>
+            </div>
+            <div class="setting-row">
+              <span>Overlay shows</span>
               <div class="checks">
                 <label><input type="checkbox" id="colPrice" /> Price</label>
                 <label><input type="checkbox" id="colChange" /> Change</label>
-                <label><input type="checkbox" id="colRating" /> Tech</label>
+                <label><input type="checkbox" id="colRating" /> Rating</label>
               </div>
             </div>
-          </section>
-
-          <section class="setting-group">
-            <h3>Alert sounds</h3>
-
-            <label class="switch-row">
-              <span>Play a sound when a rating changes</span>
-              <input type="checkbox" id="setSounds" />
-            </label>
-
-            <div id="soundList" class="sound-list">
-              <div class="sound-row" data-key="strongBuy">
-                <span class="sound-name sb">Strong Buy</span>
-                <select class="sound-select" aria-label="Sound for Strong Buy"></select>
-                <button type="button" class="sound-preview" title="Preview this sound">
-                  &#9654;
-                </button>
-              </div>
-              <div class="sound-row" data-key="buy">
-                <span class="sound-name b">Buy</span>
-                <select class="sound-select" aria-label="Sound for Buy"></select>
-                <button type="button" class="sound-preview" title="Preview this sound">
-                  &#9654;
-                </button>
-              </div>
-              <div class="sound-row" data-key="neutral">
-                <span class="sound-name n">Neutral</span>
-                <select class="sound-select" aria-label="Sound for Neutral"></select>
-                <button type="button" class="sound-preview" title="Preview this sound">
-                  &#9654;
-                </button>
-              </div>
-              <div class="sound-row" data-key="sell">
-                <span class="sound-name s">Sell</span>
-                <select class="sound-select" aria-label="Sound for Sell"></select>
-                <button type="button" class="sound-preview" title="Preview this sound">
-                  &#9654;
-                </button>
-              </div>
-              <div class="sound-row" data-key="strongSell">
-                <span class="sound-name ss">Strong Sell</span>
-                <select class="sound-select" aria-label="Sound for Strong Sell"></select>
-                <button type="button" class="sound-preview" title="Preview this sound">
-                  &#9654;
-                </button>
-              </div>
-            </div>
-
-            <p class="settings-hint sound-hint">
-              Each rating can use a different tone. Sounds play only when a rating changes while the
-              US market is open.
+            <p class="settings-hint">
+              Click-through: never blocks the app behind it. <b>Ctrl+Alt+O</b> toggles the overlay,
+              <b>Ctrl+Alt+M</b> brings this window back.
             </p>
           </section>
-
-          <section class="setting-group">
-            <h3>Window</h3>
-
-            <label class="switch-row">
-              <span>Keep main window on top</span>
-              <input type="checkbox" id="setAlwaysOnTop" />
-            </label>
-          </section>
-
-          <p class="settings-hint">
-            The overlay is click-through: it never blocks the app behind it. Use the main window to
-            open links. <b>Ctrl+Alt+O</b> toggles the overlay, <b>Ctrl+Alt+M</b> brings this window
-            back.
-          </p>
-        </div>
-
-        <div class="modal-foot">
-          <span class="search-status">Changes apply instantly.</span>
-          <button id="closeSettingsBtn" class="ghost" type="button">Close</button>
         </div>
       </div>
     </div>

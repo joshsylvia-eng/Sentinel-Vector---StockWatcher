@@ -20,7 +20,7 @@ fs.mkdirSync(outDir, { recursive: true });
 
 // `--exe` runs the packaged portable build instead of the dev Electron binary.
 const useExe = process.argv.includes('--exe');
-const exePath = path.join(projectRoot, 'dist', 'SentinelVector-StockWatcher.exe');
+const exePath = path.join(projectRoot, 'dist', 'win-unpacked', 'Sentinel Vector - StockWatcher.exe');
 const binary = useExe ? exePath : electronPath;
 const launchArgs = ['--remote-debugging-port=9222'];
 if (!useExe) launchArgs.push('.');
@@ -197,6 +197,7 @@ async function setBackdrop(cdp, hex) {
         const rowEl = document.querySelector(
           '#gridBody tr[data-symbol="' + target.symbol + '"]'
         );
+        const items = Array.from(document.querySelectorAll('#changeFeedItems .change-item'));
         return {
           symbol: target.symbol,
           from: target.rating,
@@ -204,16 +205,17 @@ async function setBackdrop(cdp, hex) {
           second: second.symbol,
           secondTo: next2,
           feedHidden: document.querySelector('#changeFeed').hidden,
-          items: document.querySelectorAll('#changeFeedItems .change-item').length,
-          texts: Array.from(document.querySelectorAll('#changeFeedItems .change-item')).map((el) =>
-            el.innerText.replace(/\\s+/g, ' ').trim()
-          ),
+          items: items.length,
+          texts: items.map((el) => el.innerText.replace(/\\s+/g, ' ').trim()),
+          itemHeights: items.map((el) => Math.round(el.getBoundingClientRect().height)),
           highlight: rowEl ? rowEl.className : '(missing)',
           highlightCount: document.querySelectorAll('#gridBody tr.row-changed').length,
           windowHeight: window.innerHeight,
           feedHeight: Math.round(
             document.querySelector('#changeFeed').getBoundingClientRect().height
           ),
+          feedBottom: Math.round(document.querySelector('#changeFeed').getBoundingClientRect().bottom),
+          innerBottom: window.innerHeight,
         };
       })()
     `);

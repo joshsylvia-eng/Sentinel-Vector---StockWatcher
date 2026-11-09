@@ -10,7 +10,8 @@
     "start": "electron .",
     "test:data": "node tools/test-data.js",
     "icon": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/make-icon.ps1",
-    "build": "electron-builder --win portable"
+    "build": "electron-builder --win nsis",
+    "build:portable": "electron-builder --win portable"
   },
   "devDependencies": {
     "electron": "^45.2.1",
@@ -33,7 +34,7 @@
       "icon": "build/icon.png",
       "target": [
         {
-          "target": "portable",
+          "target": "nsis",
           "arch": [
             "x64"
           ]
@@ -42,6 +43,18 @@
     },
     "portable": {
       "artifactName": "SentinelVector-StockWatcher.exe"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Sentinel Vector - StockWatcher",
+      "uninstallDisplayName": "Sentinel Vector - StockWatcher",
+      "artifactName": "SentinelVector-StockWatcher-Setup-${version}.exe",
+      "runAfterFinish": true,
+      "deleteAppDataOnUninstall": false
     }
   }
 }

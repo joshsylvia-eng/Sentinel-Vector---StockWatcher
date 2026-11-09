@@ -49,6 +49,7 @@ function ratingClass(rating) {
     case 'Buy':
       return 'b';
     case 'Neutral':
+    case 'Hold':
       return 'n';
     case 'Sell':
       return 's';
@@ -57,6 +58,47 @@ function ratingClass(rating) {
     default:
       return 'na';
   }
+}
+
+const RATING_SCORE = { 'Strong Buy': 1, Buy: 0.5, Neutral: 0, Hold: 0, Sell: -0.5, 'Strong Sell': -1 };
+
+/** The rating a given table column shows for this row. */
+function ratingFor(row, column) {
+  if (column === 'rating') return row.rating || null;
+  if (column === 'analyst') return row.analystRating || null;
+  const record = (row.ext || {})[column];
+  return (record && record.rating) || null;
+}
+
+function scoreFor(row, column) {
+  if (column === 'rating' && Number.isFinite(row.ratingScore)) return row.ratingScore;
+  const record = (row.ext || {})[column];
+  if (record && Number.isFinite(record.score)) return record.score;
+  const rating = ratingFor(row, column);
+  return rating in RATING_SCORE ? RATING_SCORE[rating] : null;
+}
+
+function sortedRows() {
+  const display = settings.display || {};
+  const key = display.overlaySort || 'none';
+  if (key === 'none') return rows;
+  const dir = display.overlaySortDir === 'asc' ? 1 : -1;
+
+  const value = (row) => {
+    if (key === 'symbol') return row.symbol;
+    if (key === 'price' || key === 'changePct') return Number.isFinite(row[key]) ? row[key] : null;
+    return scoreFor(row, key);
+  };
+
+  return rows.slice().sort((a, b) => {
+    const left = value(a);
+    const right = value(b);
+    if (left == null && right == null) return a.symbol.localeCompare(b.symbol);
+    if (left == null) return 1; // unrated rows always sink to the bottom
+    if (right == null) return -1;
+    if (typeof left === 'string') return left.localeCompare(right) * dir;
+    return (left - right) * dir || a.symbol.localeCompare(b.symbol);
+  });
 }
 
 function rowHtml(row) {
@@ -78,9 +120,8 @@ function rowHtml(row) {
     parts.push(`<span class="ov-delta ${changeClass}">${changeText}</span>`);
   }
   if (columns.rating !== false) {
-    parts.push(
-      `<span class="ov-pill ${ratingClass(row.rating)}"><i></i>${esc(row.rating || '—')}</span>`
-    );
+    const rating = ratingFor(row, (settings.display && settings.display.overlayRating) || 'rating');
+    parts.push(`<span class="ov-pill ${ratingClass(rating)}"><i></i>${esc(rating || '—')}</span>`);
   }
 
   return `<div class="ov-row">${parts.join('')}</div>`;
@@ -93,10 +134,13 @@ function applyBackground() {
   document.body.classList.remove('bg-none', 'bg-dim', 'bg-solid');
   document.body.classList.add(`bg-${background}`);
   document.body.style.setProperty('--ov-dim', String(display.overlayDim ?? 0.45));
+  // Only the colour-blind palette carries over: the overlay floats over other
+  // apps, so the light theme's dark-on-white text would be unreadable there.
+  document.body.classList.toggle('theme-contrast', display.theme === 'contrast');
 }
 
 function render() {
-  $('#overlayRows').innerHTML = rows.map(rowHtml).join('');
+  $('#overlayRows').innerHTML = sortedRows().map(rowHtml).join('');
   $('#overlayEmpty').classList.toggle('hidden', rows.length > 0);
   applyBackground();
 

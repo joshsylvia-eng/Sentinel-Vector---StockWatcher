@@ -46,6 +46,24 @@ function line(label) {
   const url = await investing.resolveInvestingUrl(us.symbol);
   console.log(url);
 
+  // Keyed APIs: set FINNHUB_KEY / TWELVEDATA_KEY / ALPHAVANTAGE_KEY / TAAPI_KEY to try them.
+  const apis = require('../src/main/sources/apis');
+  for (const [id, env] of [
+    ['finnhub', 'FINNHUB_KEY'],
+    ['twelvedata', 'TWELVEDATA_KEY'],
+    ['alphavantage', 'ALPHAVANTAGE_KEY'],
+    ['taapi', 'TAAPI_KEY'],
+  ]) {
+    if (!process.env[env]) continue;
+    console.log(line(id));
+    try {
+      const result = await apis[id](us.symbol, { key: process.env[env] });
+      console.log(result.rating, result.tip);
+    } catch (error) {
+      console.log('  failed:', error.message);
+    }
+  }
+
   console.log('\nAll data sources OK.');
 })().catch((error) => {
   console.error('\nFAILED:', error);

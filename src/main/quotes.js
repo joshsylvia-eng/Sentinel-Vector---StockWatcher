@@ -72,6 +72,15 @@ async function fetchRows(items) {
       maScore: rating ? rating.maScore : null,
       oscScore: rating ? rating.oscScore : null,
 
+      analystRating: rating ? rating.analystRating : null,
+      analystMark: rating ? rating.analystMark : null,
+      priceTarget: rating ? rating.priceTarget : null,
+
+      // Background provider ratings (Investing, Finnhub, Twelve Data,
+      // Alpha Vantage, TAAPI) are cached on the item and refreshed separately,
+      // so a failed or throttled fetch never blanks the row.
+      ext: item.ext || {},
+
       quoteError: quote.ok ? null : quote.error,
       ratingError: rating ? null : ratingsError || 'No rating',
       updatedAt: Date.now(),
@@ -81,4 +90,29 @@ async function fetchRows(items) {
   return { rows, ratingsError };
 }
 
-module.exports = { fetchRows };
+const INDICES = [
+  { symbol: '^IXIC', label: 'Nasdaq' },
+  { symbol: '^DJI', label: 'Dow' },
+  { symbol: '^GSPC', label: 'S&P' },
+];
+
+/**
+ * Day change for the three major US indices. A failed index returns nulls
+ * rather than throwing, so it never blocks the watchlist refresh.
+ */
+async function fetchIndices() {
+  return Promise.all(
+    INDICES.map(async ({ symbol, label }) => {
+      try {
+        const quote = await yahoo.fetchQuote(symbol);
+        const change =
+          quote.price != null && quote.previousClose != null ? quote.price - quote.previousClose : null;
+        return { symbol, label, price: quote.price, change, changePct: quote.changePct };
+      } catch {
+        return { symbol, label, price: null, change: null, changePct: null };
+      }
+    })
+  );
+}
+
+module.exports = { fetchRows, fetchIndices };

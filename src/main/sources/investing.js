@@ -11,26 +11,34 @@ const execFileAsync = promisify(execFile);
  * TLS fingerprint. curl.exe (shipped with Windows 10 1803+) passes, so the
  * search page is fetched through it and parsed locally.
  */
-async function curlText(url) {
+async function curlText(url, { accept = 'text/html,application/xhtml+xml', headers = [], secFetch = true } = {}) {
   const args = [
     '-s',
+    '-L',
     '--max-time',
     '20',
     '--compressed',
     '-H',
     `User-Agent: ${UA}`,
     '-H',
-    'Accept: text/html,application/xhtml+xml',
+    `Accept: ${accept}`,
     '-H',
     'Accept-Language: en-US,en;q=0.9',
-    '-H',
-    'Sec-Fetch-Dest: document',
-    '-H',
-    'Sec-Fetch-Mode: navigate',
-    '-H',
-    'Sec-Fetch-Site: none',
-    url,
   ];
+
+  if (secFetch) {
+    args.push(
+      '-H',
+      'Sec-Fetch-Dest: document',
+      '-H',
+      'Sec-Fetch-Mode: navigate',
+      '-H',
+      'Sec-Fetch-Site: none'
+    );
+  }
+
+  for (const header of headers) args.push('-H', header);
+  args.push(url);
 
   for (const binary of ['curl.exe', 'curl']) {
     try {
@@ -94,7 +102,7 @@ function extractResultsArray(html) {
  * The search returns the same company on several exchanges (USA, Switzerland,
  * Mexico, ...). The USA entry is the one without a "?cid=" country suffix.
  */
-async function resolveInvestingUrl(symbol) {
+async function resolveInvestingListing(symbol) {
   const html = await curlText(
     `https://www.investing.com/search/?q=${encodeURIComponent(symbol)}`
   );
@@ -114,7 +122,20 @@ async function resolveInvestingUrl(symbol) {
 
   if (!chosen || !chosen.link) throw new Error('No United States listing found');
 
-  return `https://www.investing.com${String(chosen.link).split('?')[0]}`;
+  const pairId = Number(chosen.pairId);
+  return {
+    url: `https://www.investing.com${String(chosen.link).split('?')[0]}`,
+    pairId: Number.isFinite(pairId) && pairId > 0 ? Math.round(pairId) : null,
+  };
 }
 
-module.exports = { resolveInvestingUrl, extractResultsArray };
+async function resolveInvestingUrl(symbol) {
+  return (await resolveInvestingListing(symbol)).url;
+}
+
+module.exports = {
+  resolveInvestingUrl,
+  resolveInvestingListing,
+  extractResultsArray,
+  curlText,
+};

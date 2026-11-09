@@ -48,6 +48,19 @@ function bucket(score) {
 }
 
 /**
+ * Analyst consensus uses a 1-5 mark where 1 is a strong buy. The buckets are
+ * the ones TradingView itself uses on its analyst rating widget.
+ */
+function analystBucket(mark) {
+  if (typeof mark !== 'number' || !Number.isFinite(mark)) return null;
+  if (mark <= 1.5) return 'Strong Buy';
+  if (mark <= 2.5) return 'Buy';
+  if (mark <= 3.5) return 'Hold';
+  if (mark <= 4.5) return 'Sell';
+  return 'Strong Sell';
+}
+
+/**
  * One batched request covers the whole watchlist.
  * Returns a map of "EXCHANGE:TICKER" -> rating details.
  */
@@ -57,17 +70,30 @@ async function fetchRatings(tickers) {
 
   const data = await scan({
     symbols: { tickers: unique, query: { types: [] } },
-    columns: ['name', 'close', 'volume', 'Recommend.All', 'Recommend.MA', 'Recommend.Other'],
+    columns: [
+      'name',
+      'close',
+      'volume',
+      'Recommend.All',
+      'Recommend.MA',
+      'Recommend.Other',
+      'recommendation_mark',
+      'price_target_average',
+    ],
   });
 
   const ratings = {};
   for (const row of data.data || []) {
-    const [, , , all, ma, other] = row.d;
+    const [, , , all, ma, other, mark, target] = row.d;
+    const analystMark = typeof mark === 'number' ? mark : null;
     ratings[row.s] = {
       score: typeof all === 'number' ? all : null,
       rating: bucket(all),
       maScore: typeof ma === 'number' ? ma : null,
       oscScore: typeof other === 'number' ? other : null,
+      analystMark,
+      analystRating: analystBucket(analystMark),
+      priceTarget: typeof target === 'number' ? target : null,
     };
   }
   return ratings;
@@ -122,4 +148,4 @@ async function resolveTicker(symbol, exchangeCode) {
   return `${toTvPrefix(exchangeCode)}:${String(symbol || '').toUpperCase().replace(/-/g, '.')}`;
 }
 
-module.exports = { fetchRatings, resolveTicker, bucket };
+module.exports = { fetchRatings, resolveTicker, bucket, analystBucket };
